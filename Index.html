@@ -1,0 +1,1408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Sunset Flight - Telegram Mini App</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    
+    <!-- ========================================== -->
+    <!-- [INSERT MONETAG SDK HERE] -->
+    <script src='//libtl.com/sdk.js' data-zone='11219578' data-sdk='show_11219578'></script>
+    <!-- ========================================== -->
+
+    <style>
+        :root {
+            --bg-color: #8a3003; 
+            --panel-bg: rgba(25, 23, 33, 0.95);
+            --primary-glow: #f39c12; 
+            --accent-warm: #e74c3c;    
+            --success-green: #2ecc71;
+            --gold: #ffd700;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            background-image: 
+                radial-gradient(circle at bottom, rgba(230, 126, 34, 0.15) 0%, rgba(12, 11, 17, 0) 70%),
+                linear-gradient(rgba(255, 255, 255, 0.01) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.01) 1px, transparent 1px);
+            background-size: 100% 100%, 30px 30px, 30px 30px;
+            overflow: hidden;
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            color: #fff;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent; 
+        }
+
+        #gameCanvas {
+            display: none; /* জ্যামিতিক টগলিং এর জন্য শুরুতে হাইড থাকবে */
+            border-radius: 20px;
+            z-index: 5; 
+            border: 1px solid rgba(243, 156, 18, 0.15);
+            box-shadow: none !important;
+        }
+
+        /* Dusk UI Panels */
+        .screen {
+            position: absolute;
+            width: 90%;
+            max-width: 380px;
+            background: var(--panel-bg);
+            backdrop-filter: blur(25px);
+            -webkit-backdrop-filter: blur(25px);
+            border: 1px solid rgba(243, 156, 18, 0.2);
+            border-radius: 28px;
+            padding: 24px 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            box-sizing: border-box;
+            box-shadow: none !important;
+            animation: panelFadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+            z-index: 10; 
+        }
+
+        @keyframes panelFadeIn {
+            from { opacity: 0; transform: scale(0.95) translateY(10px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+
+        .header-logo {
+            font-size: 28px;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            background: linear-gradient(135deg, var(--primary-glow), var(--accent-warm));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 4px;
+        }
+
+        .subtitle {
+            font-size: 11px;
+            color: #7d798a;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 20px;
+        }
+
+        /* Stats Cards */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px;
+            width: 100%;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.04);
+            border-radius: 18px;
+            padding: 14px 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .stat-label {
+            font-size: 10px;
+            color: #8c8899;
+            text-transform: uppercase;
+            margin-bottom: 5px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+        }
+
+        .stat-val {
+            font-size: 18px;
+            font-weight: 800;
+        }
+
+        .active-boosts-bar {
+            width: 100%;
+            background: rgba(243, 156, 18, 0.06);
+            border: 1px dashed rgba(243, 156, 18, 0.2);
+            border-radius: 12px;
+            padding: 10px;
+            margin-bottom: 20px;
+            box-sizing: border-box;
+            font-size: 11px;
+            display: none;
+        }
+
+        /* Buttons */
+        .btn-pill {
+            background: linear-gradient(135deg, var(--primary-glow), #e67e22);
+            color: #120e0a;
+            border: none;
+            width: 100%;
+            padding: 16px;
+            font-size: 15px;
+            font-weight: 800;
+            border-radius: 18px;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            transition: all 0.2s ease;
+            margin: 6px 0;
+        }
+
+        .btn-pill:disabled {
+            background: #555 !important;
+            color: #888 !important;
+            cursor: not-allowed;
+        }
+
+        .btn-pill:active:not(:disabled) {
+            transform: scale(0.96);
+        }
+
+        .btn-outline {
+            background: rgba(255, 255, 255, 0.03);
+            color: #fff;
+            border: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        .btn-outline:active {
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        /* Shop Scroller */
+        .shop-scroll {
+            width: 100%;
+            max-height: 290px;
+            overflow-y: auto;
+            margin-bottom: 20px;
+            padding-right: 5px;
+        }
+
+        .shop-scroll::-webkit-scrollbar {
+            width: 3px;
+        }
+        .shop-scroll::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 3px;
+        }
+
+        .shop-card {
+            background: rgba(255, 255, 255, 0.01);
+            border: 1px solid rgba(255, 255, 255, 0.03);
+            border-radius: 16px;
+            padding: 14px;
+            margin-bottom: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            text-align: left;
+        }
+
+        .item-details h4 {
+            margin: 0;
+            font-size: 13px;
+            color: #fff;
+            font-weight: 700;
+        }
+
+        .item-details p {
+            margin: 3px 0 0 0;
+            font-size: 11px;
+            color: #888494;
+        }
+
+        .buy-btn {
+            background: linear-gradient(135deg, var(--accent-warm), #c0392b);
+            border: none;
+            color: white;
+            padding: 10px 16px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 800;
+            cursor: pointer;
+            text-transform: uppercase;
+        }
+
+        .shop-divider {
+            font-size: 11px;
+            color: var(--primary-glow);
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin: 15px 0 10px 0;
+            font-weight: bold;
+            border-bottom: 1px solid rgba(243, 156, 18, 0.15);
+            padding-bottom: 4px;
+            text-align: left;
+        }
+
+        /* Modals */
+        .alert-overlay {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(12, 11, 17, 0.85);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+        }
+
+        .alert-box {
+            background: #191721;
+            border: 1px solid var(--primary-glow);
+            box-shadow: none !important;
+            border-radius: 24px;
+            padding: 25px;
+            width: 85%;
+            max-width: 320px;
+            text-align: center;
+            animation: alertScale 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        @keyframes alertScale {
+            from { transform: scale(0.85); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+
+        .alert-title {
+            font-size: 18px;
+            font-weight: 800;
+            color: var(--primary-glow);
+            margin-bottom: 10px;
+            text-transform: uppercase;
+        }
+
+        .alert-text {
+            font-size: 13px;
+            color: #b1adbe;
+            line-height: 1.4;
+            margin-bottom: 20px;
+        }
+
+        .alert-btn {
+            background: #fff;
+            color: #000;
+            border: none;
+            padding: 10px 20px;
+            font-weight: bold;
+            border-radius: 10px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 12px;
+            text-transform: uppercase;
+        }
+
+        .timer-badge {
+            font-size: 9px;
+            background: rgba(243, 156, 18, 0.1);
+            color: var(--primary-glow);
+            padding: 3px 6px;
+            border-radius: 5px;
+            margin-top: 4px;
+            font-weight: bold;
+            display: inline-block;
+        }
+
+        /* SVG Circular Progress Bar styles (২২০ পিক্সেল) */
+        .circle-container {
+            position: relative;
+            width: 220px;   
+            height: 220px;  
+            margin: 10px 0;
+        }
+
+        .progress-ring {
+            transform: rotate(-90deg);
+        }
+
+        .progress-ring__circle {
+            transition: stroke-dashoffset 0.35s;
+            transform-origin: 50% 50%;
+        }
+
+        .circle-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 38px; 
+            font-weight: 900;
+            color: #fff;
+        }
+
+        /* PREMIUM AUTO-CLOSE SLIDE UP TOAST */
+        .toast-box {
+            position: absolute;
+            bottom: 12px; 
+            background: rgba(25, 23, 33, 0.98);
+            border: 1px solid var(--primary-glow);
+            border-radius: 14px;
+            padding: 8px 16px;
+            width: 80%;
+            max-width: 300px;
+            text-align: center;
+            z-index: 100;
+            pointer-events: none; 
+            animation: slideUp 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+
+        @keyframes slideUp {
+            from { transform: translateY(30px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        /* Fullscreen Block Panel for Country Restrictions */
+        .block-screen {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100vh;
+            background-color: #f7ff04;
+            z-index: 100000; 
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- REGIONAL RESTRICTION BLOCK SCREEN (বাংলাদেশ ব্লক স্ক্রিন) -->
+    <div class="block-screen" id="blockScreen">
+        <div class="header-logo" style="background: linear-gradient(135deg, #e74c3c, #c0392b); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Access Denied</div>
+        <p style="font-size: 14px; color: #8c8899; margin-top: 10px; max-width: 280px; line-height: 1.5;">
+            This application is currently unavailable in your region.
+        </p>
+    </div>
+
+    <!-- গেম ক্যানভাস সবসময় লেআউটে থাকবে -->
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- DASHBOARD MENU -->
+    <div class="screen" id="menuScreen">
+        <div class="header-logo">Sunset Flight</div>
+        <div class="subtitle">Arcade Dashboard</div>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <span class="stat-label">Core Wallet</span>
+                <span class="stat-val" id="menuCoins" style="color: var(--gold)">0 🪙</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-label">Energy Capacity</span>
+                <span class="stat-val" id="menuLives" style="color: #ff2d55">❤️ 0</span>
+                <span id="unlimitedBadge" class="timer-badge" style="display: none;">Infinite</span>
+                <span id="regenTimerText" style="font-size: 10px; color: #8c8899; margin-top: 4px; display: none;">Next in: --:--</span>
+            </div>
+        </div>
+
+        <div class="active-boosts-bar" id="activeBoostsBar">
+            <span style="color: var(--primary-glow); font-weight: bold;">⚡ BOOST ACTIVE:</span> 
+            <span id="boostTimeText" style="color: #fff">2x Rewards Active</span>
+        </div>
+
+        <button class="btn-pill" onclick="tryStartGame()">Fly Now (-1 ❤️)</button>
+        <button class="btn-pill btn-outline" onclick="openShop()">Enter Shop</button>
+        <button class="btn-pill btn-outline" style="background: rgba(243, 156, 18, 0.1);" onclick="openAdScreen()">Free Coins (Ads) 🪙</button>
+    </div>
+
+    <!-- THE DUSK SHOP -->
+    <div class="screen" id="shopScreen" style="display: none;">
+        <div class="header-logo" style="font-size: 24px;">The Shop</div>
+        <div class="subtitle" style="margin-bottom: 12px;">Active Balance: <span id="shopCoins" style="color: var(--gold); font-weight: bold;">0</span> Coins</div>
+
+        <div class="shop-scroll">
+            
+            <div class="shop-divider">Power Ups</div>
+
+            <div class="shop-card">
+                <div class="item-details">
+                    <h4>Single Core (❤️ +1)</h4>
+                    <p>Adds 1 life capsule to reserves.</p>
+                </div>
+                <button class="buy-btn" onclick="buyItem('single')">15 🪙</button>
+            </div>
+
+            <div class="shop-card">
+                <div class="item-details">
+                    <h4>Core Recharge (Max ❤️)</h4>
+                    <p>Restores overall energy capacity to 5.</p>
+                </div>
+                <button class="buy-btn" onclick="buyItem('full')">50 🪙</button>
+            </div>
+
+            <div class="shop-card">
+                <div class="item-details">
+                    <h4>1-Hr Infinite Core (⚡)</h4>
+                    <p>Unlocks unrestricted plays for 1 hour.</p>
+                </div>
+                <button class="buy-btn" onclick="buyItem('infinite')">150 🪙</button>
+            </div>
+
+            <div class="shop-card">
+                <div class="item-details">
+                    <h4>1-Hr Boost (🔥 2x)</h4>
+                    <p>Double rewards on runs for 1 hour.</p>
+                </div>
+                <button class="buy-btn" onclick="buyItem('mult1h')">100 🪙</button>
+            </div>
+
+            <div class="shop-card">
+                <div class="item-details">
+                    <h4>5-Hr Mega Boost (🏆 2x)</h4>
+                    <p>Double rewards on runs for 5 hours.</p>
+                </div>
+                <button class="buy-btn" onclick="buyItem('mult5h')">350 🪙</button>
+            </div>
+
+            <div class="shop-divider">Skins & Backgrounds</div>
+
+            <div class="shop-card">
+                <div class="item-details">
+                    <h4>Sunset Dusk</h4>
+                    <p>Classic warm skyline backdrops.</p>
+                </div>
+                <span id="btnBg_sunset"></span>
+            </div>
+
+            <div class="shop-card">
+                <div class="item-details">
+                    <h4>Neon Cyber</h4>
+                    <p>Vibrant cyberpunk cyber-scenery.</p>
+                </div>
+                <span id="btnBg_neon"></span>
+            </div>
+
+            <div class="shop-card">
+                <div class="item-details">
+                    <h4>Cosmic Space</h4>
+                    <p>Distant galaxy starfields.</p>
+                </div>
+                <span id="btnBg_space"></span>
+            </div>
+
+        </div>
+
+        <button class="btn-pill btn-outline" style="margin: 0;" onclick="closeShop()">Exit Shop</button>
+    </div>
+
+    <!-- AD STATION SCREEN -->
+    <div class="screen" id="adScreen" style="display: none;">
+        <div class="header-logo" style="font-size: 24px;">Ad Station</div>
+        <div class="subtitle" style="margin-bottom: 5px;">Daily Ad Limit</div>
+
+        <!-- Circular Progress Bar (২২০ পিক্সেল) -->
+        <div class="circle-container">
+            <svg class="progress-ring" width="220" height="220">
+                <circle class="progress-ring__circle" stroke="rgba(255,255,255,0.04)" stroke-width="12" fill="transparent" r="95" cx="110" cy="110"/>
+                <circle id="adProgressCircle" class="progress-ring__circle" stroke="var(--primary-glow)" stroke-width="12" fill="transparent" r="95" cx="110" cy="110" stroke-dasharray="597" stroke-dashoffset="597"/>
+            </svg>
+            <div class="circle-text" id="adPercentText">0%</div>
+        </div>
+
+        <p id="adStatusText" style="font-size: 13px; color: #b1adbe; margin-bottom: 12px; line-height: 1.4;">
+            Watch ads to earn <span style="color: var(--gold); font-weight: bold;">+15 Coins</span> per ad.
+        </p>
+
+        <button class="btn-pill" id="watchAdBtn" onclick="triggerAd()">Watch Ad</button>
+        <button class="btn-pill btn-outline" style="margin: 0;" onclick="closeAdScreen()">Back to Menu</button>
+
+        <!-- AUTO-CLOSE BOTTOM TOAST -->
+        <div class="toast-box" id="adToast" style="display: none;">
+            <div id="toastTitle" style="font-size: 13px; font-weight: 800; color: var(--primary-glow); text-transform: uppercase; margin-bottom: 3px;">TITLE</div>
+            <div id="toastText" style="font-size: 11px; color: #b1adbe; line-height: 1.3;">Message</div>
+        </div>
+    </div>
+
+    <!-- GAME OVER SCREEN -->
+    <div class="screen" id="gameOverScreen" style="display: none;">
+        <h1 style="color: #ff3b30; font-size: 26px;">CRASH DETECTED</h1>
+        <p style="margin-bottom: 15px;">Your flight path was interrupted.</p>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <span class="stat-label">Final Score</span>
+                <span class="stat-val" style="color: var(--primary-glow);" id="finalScore">0</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-label">Coins Saved</span>
+                <span class="stat-val" style="color: var(--gold);" id="earnedCoins">+0</span>
+            </div>
+        </div>
+
+        <button class="btn-pill" onclick="tryStartGame()">Fly Again (-1 ❤️)</button>
+        <button class="btn-pill btn-outline" onclick="backToMenu()">Dashboard Menu</button>
+    </div>
+
+    <!-- PREMIUM CUSTOM MODAL -->
+    <div class="alert-overlay" id="customAlertOverlay">
+        <div class="alert-box">
+            <div class="alert-title" id="alertTitle">SYSTEM REPORT</div>
+            <div class="alert-text" id="alertText">Alert placeholder message.</div>
+            <div id="modalButtonsContainer">
+                <button class="alert-btn" onclick="closeCustomAlert()">CONFIRM</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        
+        // ১. টেলিগ্রাম ক্লোজ কনফার্মেশন সিস্টেম এনেবেল করা হয়েছে
+        if (tg) {
+            tg.expand();
+            tg.enableClosingConfirmation(); 
+        }
+
+        // STRICT TESTING CONFIGURATION
+        const ALLOW_SIMULATION = false; 
+
+        // ২. ৩-সেকেন্ডের নেটওয়ার্ক টাইমআউট সহ ডাবল-এপিআই কান্ট্রি ব্লকিং সিস্টেম (BD Block)
+        async function fetchWithTimeout(resource, options = {}) {
+            const { timeout = 3000 } = options; 
+            const controller = new AbortController();
+            const id = setTimeout(() => controller.abort(), timeout);
+            const response = await fetch(resource, {
+                ...options,
+                signal: controller.signal
+            });
+            clearTimeout(id);
+            return response;
+        }
+
+        async function verifyLocation() {
+            let countryCode = '';
+            
+            try {
+                const response = await fetchWithTimeout('https://ipapi.co/json/');
+                const data = await response.json();
+                countryCode = data.country_code;
+            } catch (err) {
+                console.log("Primary API failed. Trying backup...");
+                try {
+                    const response = await fetchWithTimeout('https://ipwho.is/');
+                    const data = await response.json();
+                    countryCode = data.country_code;
+                } catch (backupErr) {
+                    console.log("Geo-blocking completely offline. Network restricted.");
+                }
+            }
+
+            if (countryCode === 'BD') {
+                document.getElementById('menuScreen').style.display = 'none';
+                document.getElementById('shopScreen').style.display = 'none';
+                document.getElementById('adScreen').style.display = 'none';
+                document.getElementById('gameOverScreen').style.display = 'none';
+                canvas.style.display = 'none';
+                
+                document.getElementById('blockScreen').style.display = 'flex';
+                isPlaying = false;
+            }
+        }
+        verifyLocation();
+
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        let audioCtx;
+
+        function initAudio() {
+            if (!audioCtx) audioCtx = new AudioCtx();
+        }
+
+        function playSound(type) {
+            try {
+                initAudio();
+                let osc = audioCtx.createOscillator();
+                let gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                if (type === 'point') {
+                    osc.frequency.setValueAtTime(587.33, audioCtx.currentTime); 
+                    osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.1); 
+                    gain.gain.setValueAtTime(0.06, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.12);
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 0.12);
+                } else if (type === 'crash') {
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+                    osc.frequency.linearRampToValueAtTime(40, audioCtx.currentTime + 0.45);
+                    gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.45);
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 0.45);
+                } else if (type === 'buy') {
+                    osc.frequency.setValueAtTime(440, audioCtx.currentTime); 
+                    osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.12); 
+                    gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.18);
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 0.18);
+                }
+            } catch (e) { console.log("Audio bypass"); }
+        }
+
+        function showNotification(title, message, isSuccess = true, redirectMode = null) {
+            const adScreenVisible = document.getElementById('adScreen').style.display === 'flex';
+
+            if (adScreenVisible) {
+                showAdToast(title, message, isSuccess);
+            } else {
+                showCustomAlert(title, message, isSuccess, redirectMode);
+            }
+        }
+
+        let toastTimeout;
+        function showAdToast(title, message, isSuccess) {
+            const toast = document.getElementById('adToast');
+            const tTitle = document.getElementById('toastTitle');
+            const tText = document.getElementById('toastText');
+
+            tTitle.innerText = title;
+            tText.innerText = message;
+
+            if (isSuccess) {
+                toast.style.borderColor = 'var(--primary-glow)';
+            } else {
+                toast.style.borderColor = '#ff3838';
+            }
+
+            toast.style.display = 'block';
+
+            clearTimeout(toastTimeout);
+
+            toastTimeout = setTimeout(() => {
+                toast.style.display = 'none';
+            }, 3000);
+        }
+
+        function showCustomAlert(title, message, isSuccess = true, redirectMode = null) {
+            document.getElementById('alertTitle').innerText = title;
+            document.getElementById('alertText').innerText = message;
+            
+            const alertBox = document.querySelector('.alert-box');
+            if (isSuccess) {
+                alertBox.style.borderColor = 'var(--primary-glow)';
+            } else {
+                alertBox.style.borderColor = '#ff3838';
+            }
+            
+            const btnContainer = document.getElementById('modalButtonsContainer');
+            
+            if (redirectMode === 'ad') {
+                btnContainer.innerHTML = `
+                    <button class="alert-btn" style="background: var(--primary-glow); color: #000;" onclick="redirectToAdScreen()">GET FREE COINS</button>
+                    <button class="alert-btn" style="background: rgba(255,255,255,0.1); color: #fff;" onclick="closeCustomAlert()">CANCEL</button>
+                `;
+            } else if (redirectMode === 'energy') {
+                btnContainer.innerHTML = `
+                    <button class="alert-btn" style="background: var(--primary-glow); color: #000;" onclick="redirectToShop()">GO TO SHOP</button>
+                    <button class="alert-btn" style="background: var(--accent-warm); color: #fff;" onclick="redirectToAdScreen()">GET FREE COINS</button>
+                    <button class="alert-btn" style="background: rgba(255,255,255,0.1); color: #fff;" onclick="closeCustomAlert()">CANCEL</button>
+                `;
+            } else {
+                btnContainer.innerHTML = `<button class="alert-btn" onclick="closeCustomAlert()">CONFIRM</button>`;
+            }
+
+            document.getElementById('customAlertOverlay').style.display = 'flex';
+        }
+
+        function closeCustomAlert() {
+            document.getElementById('customAlertOverlay').style.display = 'none';
+        }
+
+        function redirectToAdScreen() {
+            closeCustomAlert();
+            document.getElementById('shopScreen').style.display = 'none';
+            openAdScreen();
+        }
+
+        function redirectToShop() {
+            closeCustomAlert();
+            openShop();
+        }
+
+        // Canvas Setup
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        canvas.width = Math.min(window.innerWidth, 400);
+        canvas.height = Math.min(window.innerHeight, 600);
+
+        // Core Physics
+        let birdY = canvas.height / 2;
+        let velocity = 0;
+        let gravity = 0.35;
+        let jump = -6.5;
+        let score = 0;
+        let isPlaying = false;
+        let hasGameStarted = false; 
+        let pipes = [];
+        let frame = 0;
+        let groundOffset = 0;
+
+        const birdX = 80;
+        const birdSize = 16;
+        const hitboxMargin = 3;
+
+        const themes = {
+            sunset: {
+                id: 'sunset',
+                name: 'Sunset Dusk',
+                price: 0,
+                sky: ['#100b1a', '#311432', '#ff7e5f'],
+                hill: 'rgba(230, 126, 34, 0.22)',
+                ground: '#1e1b24',
+                groundLine: '#ff7e5f',
+                birdBody: '#ffb347',
+                birdWing: '#e74c3c'
+            },
+            neon: {
+                id: 'neon',
+                name: 'Neon Cyber',
+                price: 100,
+                sky: ['#040508', '#0c081c', '#2c003e'],
+                hill: 'rgba(0, 240, 255, 0.1)',
+                ground: '#0a0914',
+                groundLine: '#00f0ff',
+                birdBody: '#00f0ff',
+                birdWing: '#bd00ff'
+            },
+            space: {
+                id: 'space',
+                name: 'Cosmic Space',
+                price: 250,
+                sky: ['#010206', '#03071e', '#1a002c'],
+                hill: 'rgba(155, 89, 182, 0.15)',
+                ground: '#080810',
+                groundLine: '#9b59b6',
+                birdBody: '#9b59b6',
+                birdWing: '#3498db'
+            }
+        };
+
+        // Persistent State System
+        let totalCoins = parseInt(localStorage.getItem('cy_coins')) || 0;
+        let lives = localStorage.getItem('cy_lives') !== null ? parseInt(localStorage.getItem('cy_lives')) : 5;
+        let infiniteExpiry = parseInt(localStorage.getItem('cy_infinite_expiry')) || 0; 
+        let multiplierExpiry = parseInt(localStorage.getItem('cy_multiplier_expiry')) || 0;
+
+        // Auto Energy Regen Timers
+        let lastRegenTime = parseInt(localStorage.getItem('cy_last_regen')) || Date.now();
+        const REGEN_COOLDOWN = 300 * 1000; 
+
+        // Ads Progress State
+        let adProgress = parseInt(localStorage.getItem('cy_ad_progress')) || 0;
+
+        // Background Skins States
+        let currentBg = localStorage.getItem('cy_current_bg') || 'sunset';
+        let unlockedBgs = JSON.parse(localStorage.getItem('cy_unlocked_bgs')) || ['sunset'];
+
+        // ৩. গ্লোবাল টাচ প্রোটেকশন (রুট লেভেলের টাচ ট্র্যাকার যা সব ক্লিকে কাজ করতে বাধ্য করে)
+        document.addEventListener('mousedown', (e) => {
+            if (isPlaying) {
+                triggerJump();
+            }
+        });
+
+        document.addEventListener('touchstart', (e) => {
+            if (isPlaying) {
+                e.preventDefault(); 
+                triggerJump();
+            }
+        }, { passive: false });
+
+        setInterval(updateStatsAndTimers, 1000);
+
+        function updateStatsAndTimers() {
+            const now = Date.now();
+            const badge = document.getElementById('unlimitedBadge');
+            const livesText = document.getElementById('menuLives');
+            const boostBar = document.getElementById('activeBoostsBar');
+            const boostTimeText = document.getElementById('boostTimeText');
+            const regenTimerText = document.getElementById('regenTimerText');
+
+            if (lives < 5 && now >= infiniteExpiry) {
+                let elapsed = now - lastRegenTime;
+                if (elapsed >= REGEN_COOLDOWN) {
+                    let generatedLives = Math.floor(elapsed / REGEN_COOLDOWN);
+                    lives = Math.min(5, lives + generatedLives);
+                    lastRegenTime = lastRegenTime + (generatedLives * REGEN_COOLDOWN);
+                    saveGameData();
+                }
+                
+                let remainingRegen = Math.round((REGEN_COOLDOWN - (now - lastRegenTime)) / 1000);
+                if (remainingRegen > 0) {
+                    let rm = Math.floor(remainingRegen / 60);
+                    let rs = remainingRegen % 60;
+                    regenTimerText.style.display = 'inline-block';
+                    regenTimerText.innerText = `Next in: ${rm}:${rs < 10 ? '0' + rs : rs}`;
+                } else {
+                    regenTimerText.style.display = 'none';
+                }
+            } else {
+                regenTimerText.style.display = 'none';
+                if (lives >= 5) {
+                    lastRegenTime = now; 
+                }
+            }
+
+            if (now < infiniteExpiry) {
+                let remaining = Math.round((infiniteExpiry - now) / 1000);
+                let mins = Math.floor(remaining / 60);
+                let secs = remaining % 60;
+                
+                badge.style.display = 'inline-block';
+                badge.innerText = `⚡ ${mins}m ${secs}s`;
+                livesText.innerText = "INFINITE";
+            } else {
+                badge.style.display = 'none';
+                livesText.innerText = `${lives} / 5 ❤️`;
+            }
+
+            if (now < multiplierExpiry) {
+                let remainingMult = Math.round((multiplierExpiry - now) / 1000);
+                let hrs = Math.floor(remainingMult / 3600);
+                let mins = Math.floor((remainingMult % 3600) / 60);
+                let secs = remainingMult % 60;
+                
+                boostBar.style.display = 'block';
+                boostTimeText.innerText = `2x Multiplier Active [ ${hrs > 0 ? hrs + 'h ' : ''}${mins}m ${secs}s ]`;
+            } else {
+                boostBar.style.display = 'none';
+            }
+
+            document.getElementById('menuCoins').innerText = `${totalCoins} 🪙`;
+        }
+        updateStatsAndTimers();
+
+        function saveGameData() {
+            localStorage.setItem('cy_coins', totalCoins);
+            localStorage.setItem('cy_lives', lives);
+            localStorage.setItem('cy_infinite_expiry', infiniteExpiry);
+            localStorage.setItem('cy_multiplier_expiry', multiplierExpiry);
+            localStorage.setItem('cy_current_bg', currentBg);
+            localStorage.setItem('cy_unlocked_bgs', JSON.stringify(unlockedBgs));
+            localStorage.setItem('cy_ad_progress', adProgress);
+            localStorage.setItem('cy_last_regen', lastRegenTime);
+        }
+
+        function triggerJump() {
+            if (isPlaying) {
+                initAudio();
+                if (!hasGameStarted) {
+                    hasGameStarted = true; 
+                }
+                velocity = jump;
+                if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+            }
+        }
+
+        class Pipe {
+            constructor() {
+                this.spacing = 150;
+                this.top = Math.random() * (canvas.height / 2.5) + 60;
+                this.bottom = canvas.height - (this.top + this.spacing) - 50;
+                this.x = canvas.width;
+                this.width = 65;
+                this.speed = 2.2;
+                this.passed = false;
+            }
+
+            draw() {
+                let activeTheme = themes[currentBg] || themes.sunset;
+
+                let grad = ctx.createLinearGradient(this.x, 0, this.x + this.width, 0);
+                grad.addColorStop(0, activeTheme.ground);
+                grad.addColorStop(0.5, activeTheme.groundLine);
+                grad.addColorStop(1, activeTheme.ground);
+
+                ctx.fillStyle = grad;
+                ctx.fillRect(this.x, 0, this.width, this.top);
+                ctx.fillStyle = activeTheme.groundLine; 
+                ctx.fillRect(this.x - 2, this.top - 12, this.width + 4, 12);
+
+                ctx.fillStyle = grad;
+                ctx.fillRect(this.x, canvas.height - this.bottom - 50, this.width, this.bottom);
+                ctx.fillStyle = activeTheme.groundLine;
+                ctx.fillRect(this.x - 2, canvas.height - this.bottom - 50, this.width + 4, 12);
+            }
+
+            update() {
+                this.x -= this.speed;
+            }
+        }
+
+        function drawBackground() {
+            let activeTheme = themes[currentBg] || themes.sunset;
+
+            let skyGrad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+            skyGrad.addColorStop(0, activeTheme.sky[0]); 
+            skyGrad.addColorStop(0.6, activeTheme.sky[1]); 
+            skyGrad.addColorStop(1, activeTheme.sky[2]); 
+            ctx.fillStyle = skyGrad;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.fillStyle = activeTheme.hill;
+            ctx.beginPath();
+            ctx.moveTo(0, canvas.height - 50);
+            ctx.lineTo(120, canvas.height - 120);
+            ctx.lineTo(260, canvas.height - 60);
+            ctx.lineTo(400, canvas.height - 110);
+            ctx.lineTo(400, canvas.height - 50);
+            ctx.fill();
+
+            ctx.fillStyle = '#ffffff';
+            ctx.globalAlpha = (currentBg === 'space') ? 0.75 : 0.35;
+            ctx.fillRect(50, 60, 2, 2);
+            ctx.fillRect(180, 40, 2, 2);
+            ctx.fillRect(290, 80, 2, 2);
+            ctx.fillRect(340, 50, 2, 2);
+            if (currentBg === 'space') {
+                ctx.fillRect(100, 150, 1.5, 1.5);
+                ctx.fillRect(220, 120, 2, 2);
+                ctx.fillRect(80, 250, 1, 1);
+            }
+            ctx.globalAlpha = 1.0;
+        }
+
+        function drawGround() {
+            let activeTheme = themes[currentBg] || themes.sunset;
+
+            ctx.fillStyle = activeTheme.ground; 
+            ctx.fillRect(0, canvas.height - 50, canvas.width, 50);
+
+            ctx.fillStyle = activeTheme.groundLine; 
+            ctx.fillRect(0, canvas.height - 50, canvas.width, 4);
+
+            groundOffset = (groundOffset - 2.2) % 20;
+            ctx.strokeStyle = activeTheme.hill;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            for (let i = groundOffset; i < canvas.width; i += 20) {
+                ctx.moveTo(i, canvas.height - 25);
+                ctx.lineTo(i + 12, canvas.height - 40);
+            }
+            ctx.stroke();
+        }
+
+        function tryStartGame() {
+            const now = Date.now();
+            if (now < infiniteExpiry) {
+                initiateGame();
+            } else if (lives > 0) {
+                lives--;
+                saveGameData();
+                initiateGame();
+            } else {
+                showNotification("OUT OF CORES", "Your core energy capacity is completely depleted.", false, 'energy');
+            }
+        }
+
+        function initiateGame() {
+            document.getElementById('menuScreen').style.display = 'none';
+            document.getElementById('gameOverScreen').style.display = 'none';
+            
+            // ক্যানভাস ভিজিবল করার মেকানিজম
+            canvas.style.display = 'block';
+
+            birdY = canvas.height / 2;
+            velocity = 0;
+            score = 0;
+            pipes = [];
+            isPlaying = true;
+            hasGameStarted = false; 
+            frame = 0;
+
+            gameLoop();
+        }
+
+        function gameLoop() {
+            if (!isPlaying) return;
+
+            drawBackground();
+
+            let activeTheme = themes[currentBg] || themes.sunset;
+
+            if (hasGameStarted) {
+                if (frame % 90 === 0) {
+                    pipes.push(new Pipe());
+                }
+
+                for (let i = pipes.length - 1; i >= 0; i--) {
+                    pipes[i].update();
+                    pipes[i].draw();
+
+                    let closestX = Math.max(pipes[i].x, Math.min(birdX, pipes[i].x + pipes[i].width));
+                    let closestYTop = Math.min(birdY, pipes[i].top);
+                    let distanceXTop = birdX - closestX;
+                    let distanceYTop = birdY - closestYTop;
+                    let distanceSquaredTop = (distanceXTop * distanceXTop) + (distanceYTop * distanceYTop);
+
+                    let closestYBottom = Math.max(birdY, canvas.height - pipes[i].bottom - 50);
+                    let distanceXBottom = birdX - closestX;
+                    let distanceYBottom = birdY - closestYBottom;
+                    let distanceSquaredBottom = (distanceXBottom * distanceXBottom) + (distanceYBottom * distanceYBottom);
+
+                    let testRadius = birdSize - hitboxMargin;
+
+                    if (distanceSquaredTop < (testRadius * testRadius) || distanceSquaredBottom < (testRadius * testRadius)) {
+                        gameOver();
+                    }
+
+                    if (!pipes[i].passed && pipes[i].x + pipes[i].width < birdX) {
+                        score++;
+                        playSound('point');
+                        pipes[i].passed = true;
+                    }
+
+                    if (pipes[i].x + pipes[i].width < 0) {
+                        pipes.splice(i, 1);
+                    }
+                }
+
+                velocity += gravity;
+                birdY += velocity;
+
+                if (birdY + birdSize > canvas.height - 50) {
+                    gameOver();
+                }
+                
+                frame++;
+            } else {
+                birdY = (canvas.height / 2) + Math.sin(Date.now() * 0.005) * 6;
+
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 22px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText("TAP TO FLY", canvas.width / 2, canvas.height / 2 - 80);
+                ctx.font = '14px sans-serif';
+                ctx.fillStyle = activeTheme.groundLine;
+                ctx.fillText("Avoid obstacles to score", canvas.width / 2, canvas.height / 2 - 50);
+                ctx.textAlign = 'left'; 
+            }
+
+            drawGround();
+
+            ctx.save();
+            ctx.translate(birdX, birdY);
+            let angle = hasGameStarted ? Math.min(Math.max(velocity * 0.07, -0.4), 0.7) : 0;
+            ctx.rotate(angle);
+
+            ctx.fillStyle = activeTheme.birdBody;
+            ctx.beginPath();
+            ctx.arc(0, 0, birdSize, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = activeTheme.groundLine;
+            ctx.lineWidth = 2.5;
+            ctx.stroke();
+
+            ctx.fillStyle = activeTheme.birdWing;
+            ctx.beginPath();
+            ctx.ellipse(-7, 4, 6, 10, Math.PI / 4, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(6, -5, 4, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#000000';
+            ctx.beginPath();
+            ctx.arc(7, -5, 2, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.restore();
+
+            if (hasGameStarted) {
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 22px sans-serif';
+                ctx.fillText("Score: " + score, 20, 45);
+            }
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        function gameOver() {
+            isPlaying = false;
+            canvas.style.display = 'none';
+            playSound('crash');
+
+            if (tg && tg.HapticFeedback) {
+                tg.HapticFeedback.notificationOccurred('error');
+            }
+
+            let multiplierActive = Date.now() < multiplierExpiry;
+            let payout = multiplierActive ? score * 2 : score;
+
+            totalCoins += payout;
+            saveGameData();
+
+            document.getElementById('finalScore').innerText = score;
+            document.getElementById('earnedCoins').innerText = payout > 0 ? `+${payout}` : `0`;
+            document.getElementById('gameOverScreen').style.display = 'flex';
+            updateStatsAndTimers();
+        }
+
+        function openShop() {
+            document.getElementById('menuScreen').style.display = 'none';
+            document.getElementById('shopScreen').style.display = 'flex';
+            document.getElementById('shopCoins').innerText = totalCoins;
+            renderShopBackgrounds();
+        }
+
+        function closeShop() {
+            document.getElementById('shopScreen').style.display = 'none';
+            document.getElementById('menuScreen').style.display = 'flex';
+            updateStatsAndTimers();
+        }
+
+        // Ad Screen Management
+        function openAdScreen() {
+            document.getElementById('menuScreen').style.display = 'none';
+            document.getElementById('adScreen').style.display = 'flex';
+            updateAdProgressCircle();
+        }
+
+        function closeAdScreen() {
+            document.getElementById('adScreen').style.display = 'none';
+            document.getElementById('menuScreen').style.display = 'flex';
+            updateStatsAndTimers();
+        }
+
+        // Update SVG Progress Ring
+        function updateAdProgressCircle() {
+            const circle = document.getElementById('adProgressCircle');
+            const percentText = document.getElementById('adPercentText');
+            const adBtn = document.getElementById('watchAdBtn');
+
+            if (adProgress > 100) adProgress = 100;
+
+            const offset = 597 - (adProgress / 100) * 597; 
+            circle.style.strokeDashoffset = offset;
+            percentText.innerText = `${adProgress}%`;
+
+            if (adProgress >= 100) {
+                adBtn.innerText = "Daily Limit Reached";
+                adBtn.disabled = true;
+            }
+        }
+
+        // Cooldown and Ad triggering
+        function triggerAd() {
+            if (adProgress >= 100) {
+                showNotification("LIMIT REACHED", "You have reached your 100% daily ad watching limit.", false);
+                return;
+            }
+
+            const adBtn = document.getElementById('watchAdBtn');
+            adBtn.disabled = true;
+
+            // ==========================================
+            // [INSERT YOUR MONETAG TRIGGER METHOD / ZONE ID HERE]
+            if (typeof show_11219578 === 'function') { 
+                show_11219578().then(() => {
+                    rewardUser(); 
+                }).catch(() => {
+                    handleAdFailure();
+                });
+            } else {
+                handleAdFailure();
+            }
+            // ==========================================
+        }
+
+        function handleAdFailure() {
+            const adBtn = document.getElementById('watchAdBtn');
+            if (ALLOW_SIMULATION) {
+                simulateAdWatching();
+            } else {
+                adBtn.disabled = false;
+                showNotification("AD ERROR", "Failed to load advertisement. No rewards granted.", false);
+            }
+        }
+
+        function simulateAdWatching() {
+            const adBtn = document.getElementById('watchAdBtn');
+            adBtn.innerText = "Loading Ad...";
+
+            setTimeout(() => {
+                adBtn.innerText = "Watching (3s)...";
+                setTimeout(() => {
+                    adBtn.innerText = "Watching (2s)...";
+                    setTimeout(() => {
+                        adBtn.innerText = "Watching (1s)...";
+                        setTimeout(() => {
+                            rewardUser(); 
+                        }, 1000);
+                    }, 1000);
+                }, 1000);
+            }, 1000);
+        }
+
+        function rewardUser() {
+            adProgress += 1;
+            totalCoins += 15;
+            saveGameData();
+
+            playSound('buy');
+            updateAdProgressCircle();
+            if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+
+            showNotification("AD COMPLETED", "You earned +15 Coins for watching the ad successfully!", true);
+
+            startAdButtonCooldown();
+        }
+
+        function startAdButtonCooldown() {
+            const adBtn = document.getElementById('watchAdBtn');
+            adBtn.disabled = true;
+            let cooldownTime = 10;
+
+            const interval = setInterval(() => {
+                cooldownTime--;
+                if (adProgress < 100) {
+                    adBtn.innerText = `Wait ${cooldownTime}s...`;
+                }
+
+                if (cooldownTime <= 0) {
+                    clearInterval(interval);
+                    if (adProgress < 100) {
+                        adBtn.innerText = "Watch Ad";
+                        adBtn.disabled = false;
+                    } else {
+                        adBtn.innerText = "Daily Limit Reached";
+                        adBtn.disabled = true;
+                    }
+                }
+            }, 1000);
+        }
+
+        // Render Background Shop Items
+        function renderShopBackgrounds() {
+            Object.keys(themes).forEach(bgId => {
+                const container = document.getElementById(`btnBg_${bgId}`);
+                if (!container) return;
+
+                if (currentBg === bgId) {
+                    container.innerHTML = `<button class="buy-btn" style="background: #7f8c8d; cursor: not-allowed;" disabled>Active</button>`;
+                } else if (unlockedBgs.includes(bgId)) {
+                    container.innerHTML = `<button class="buy-btn" style="background: #27ae60" onclick="equipBg('${bgId}')">Equip</button>`;
+                } else {
+                    container.innerHTML = `<button class="buy-btn" onclick="buyBg('${bgId}', ${themes[bgId].price})">${themes[bgId].price} 🪙</button>`;
+                }
+            });
+        }
+
+        function buyBg(bgId, price) {
+            initAudio();
+            if (totalCoins >= price) {
+                totalCoins -= price;
+                unlockedBgs.push(bgId);
+                currentBg = bgId;
+                saveGameData();
+                document.getElementById('shopCoins').innerText = totalCoins;
+                playSound('buy');
+                if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+                showNotification("THEME UNLOCKED", `${themes[bgId].name} is now unlocked and equipped!`, true);
+                renderShopBackgrounds();
+            } else {
+                showNotification("INSUFFICIENT COINS", "You do not have enough coins to purchase this theme skin.", false, 'ad');
+            }
+        }
+
+        function equipBg(bgId) {
+            initAudio();
+            currentBg = bgId;
+            saveGameData();
+            playSound('buy');
+            showNotification("THEME EQUIPPED", `${themes[bgId].name} skin has been set successfully!`, true);
+            renderShopBackgrounds();
+        }
+
+        function buyItem(itemType) {
+            initAudio();
+            const now = Date.now();
+
+            if (itemType === 'single') {
+                if (totalCoins >= 15) {
+                    if (lives >= 5) {
+                        showNotification("COMPACT RESERVES FULL", "Your energy capacity is already at its maximum limit.", false);
+                        return;
+                    }
+                    totalCoins -= 15;
+                    lives += 1;
+                    completePurchase();
+                } else {
+                    showNotification("INSUFFICIENT BALANCE", "You do not have enough coins for this upgrade.", false, 'ad');
+                }
+            } else if (itemType === 'full') {
+                if (totalCoins >= 50) {
+                    if (lives >= 5) {
+                        showNotification("COMPACT RESERVES FULL", "Your energy capacity is already at its maximum limit.", false);
+                        return;
+                    }
+                    totalCoins -= 50;
+                    lives = 5;
+                    completePurchase();
+                } else {
+                    showNotification("INSUFFICIENT BALANCE", "You do not have enough coins for this upgrade.", false, 'ad');
+                }
+            } else if (itemType === 'infinite') {
+                if (totalCoins >= 150) {
+                    totalCoins -= 150;
+                    const oneHour = 60 * 60 * 1000;
+                    const baseExpiry = now < infiniteExpiry ? infiniteExpiry : now;
+                    infiniteExpiry = baseExpiry + oneHour;
+                    completePurchase();
+                } else {
+                    showNotification("INSUFFICIENT BALANCE", "You do not have enough coins for this upgrade.", false, 'ad');
+                }
+            } else if (itemType === 'mult1h') {
+                if (totalCoins >= 100) {
+                    totalCoins -= 100;
+                    const oneHour = 60 * 60 * 1000;
+                    const baseExpiry = now < multiplierExpiry ? multiplierExpiry : now;
+                    multiplierExpiry = baseExpiry + oneHour;
+                    completePurchase();
+                } else {
+                    showNotification("INSUFFICIENT BALANCE", "You do not have enough coins for this upgrade.", false, 'ad');
+                }
+            } else if (itemType === 'mult5h') {
+                if (totalCoins >= 350) {
+                    totalCoins -= 350;
+                    const fiveHours = 5 * 60 * 60 * 1000;
+                    const baseExpiry = now < multiplierExpiry ? multiplierExpiry : now;
+                    multiplierExpiry = baseExpiry + fiveHours;
+                    completePurchase();
+                } else {
+                    showNotification("INSUFFICIENT BALANCE", "You do not have enough coins for this upgrade.", false, 'ad');
+                }
+            }
+        }
+
+        function completePurchase() {
+            playSound('buy');
+            saveGameData();
+            document.getElementById('shopCoins').innerText = totalCoins;
+            if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+            showNotification("UPGRADE APPLIED", "The core modifications have been successfully loaded.", true);
+        }
+
+        function backToMenu() {
+            document.getElementById('gameOverScreen').style.display = 'none';
+            document.getElementById('menuScreen').style.display = 'flex';
+            updateStatsAndTimers();
+        }
+    </script>
+</body>
+</html>
