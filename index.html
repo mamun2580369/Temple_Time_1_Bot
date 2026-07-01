@@ -1204,8 +1204,10 @@
                 return;
             }
 
-            const adBtn = document.getElementById('watchAdBtn');
-            adBtn.disabled = true;
+             // ক্লিক করার সাথে সাথেই ১০ সেকেন্ডের লক টাইমার চালু হবে
+            startAdButtonCooldown();
+
+            // ব্যাকগ্রাউন্ডে বিজ্ঞাপন লোড হওয়া শুরু হবে
 
             // ==========================================
             // [INSERT YOUR MONETAG TRIGGER METHOD / ZONE ID HERE]
@@ -1226,7 +1228,7 @@
             if (ALLOW_SIMULATION) {
                 simulateAdWatching();
             } else {
-                adBtn.disabled = false;
+                
                 showNotification("AD ERROR", "Failed to load advertisement. No rewards granted.", false);
             }
         }
@@ -1260,7 +1262,7 @@
 
             showNotification("AD COMPLETED", "You earned +15 Coins for watching the ad successfully!", true);
 
-            startAdButtonCooldown();
+            
         }
 
         function startAdButtonCooldown() {
